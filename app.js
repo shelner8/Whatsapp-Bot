@@ -35,6 +35,10 @@ const client = new Client({
             '--disable-notifications',
             '--disable-extensions',
             '--disable-background-timer-throttling',
+            // --- TAMBAHAN AMAN (TIDAK MENGURANGI PERFORMANS) ---
+            '--mute-audio',                     // Mematikan engine audio browser
+            '--disable-features=TranslateUI',   // Mematikan fitur translate UI bawaan
+            '--disable-software-rasterizer',    // Mencegah penggunaan CPU untuk rendering grafis
             '--js-flags="--max-old-space-size=4096"' 
         ]
     }
@@ -50,46 +54,47 @@ client.on('qr', (qr) => {
 
 client.on('ready', () => {
     console.log('>>> SYSTEM: Bot Keuangan (Ultimate Style) Aktif & Gesit!');
-
-    // --- FITUR: PENGINGAT & REKAP OTOMATIS (JAM 23:00) ---
-    // Menggunakan logika Rolling Balance: Saldo Kemarin + In Hari Ini vs Out Hari Ini
-    cron.schedule('0 0 23 * * *', async () => {
-        try {
-            const response = await axios.post(GOOGLE_SHEET_URL, { action: 'GET_REKAP' });
-            const { masuk, keluar, saldo } = response.data;
-
-            const autoMsg = [
-                `🌙 *LAPORAN PENUTUP HARI INI*`,
-                `━━━━━━━━━━━━━━━━━━━━`,
-                `Halo! Berikut ringkasan saldo Anda hari ini:`,
-                ``,
-                `💰 Saldo Awal Hari Ini:`,
-                `👉 *Rp ${masuk.toLocaleString('id-ID')}*`,
-                ``,
-                `💸 Belanja Hari Ini:`,
-                `👉 *Rp ${keluar.toLocaleString('id-ID')}*`,
-                `━━━━━━━━━━━━━━━━━━━━`,
-                `✨ *SISA SALDO AKHIR:*`,
-                `👉 *Rp ${saldo.toLocaleString('id-ID')}*`,
-                `━━━━━━━━━━━━━━━━━━━━`,
-                `💡 _Sudah dicatat semua? Yuk cek kembali sebelum istirahat!_`
-            ].join('\n');
-
-            for (const chatId of ALLOWED_NUMBERS) {
-                await client.sendMessage(chatId, autoMsg);
-            }
-            console.log('>>> SYSTEM: Laporan otomatis jam 23:00 terkirim.');
-        } catch (err) {
-            console.error("Gagal mengirim rekap otomatis:", err.message);
-        }
-    }, {
-        scheduled: true,
-        timezone: "Asia/Jakarta"
-    });
 });
 
 client.on('disconnected', (reason) => {
     console.log('>>> SYSTEM: Bot terputus!', reason);
+});
+
+// --- FITUR: PENGINGAT & REKAP OTOMATIS (JAM 23:00) ---
+// Menggunakan logika Rolling Balance: Saldo Kemarin + In Hari Ini vs Out Hari Ini
+// Ditaruh di luar event 'ready' agar alarm tidak ganda saat bot reconnect
+cron.schedule('0 0 23 * * *', async () => {
+    try {
+        const response = await axios.post(GOOGLE_SHEET_URL, { action: 'GET_REKAP' });
+        const { masuk, keluar, saldo } = response.data;
+
+        const autoMsg = [
+            `🌙 *LAPORAN PENUTUP HARI INI*`,
+            `━━━━━━━━━━━━━━━━━━━━`,
+            `Halo! Berikut ringkasan saldo Anda hari ini:`,
+            ``,
+            `💰 Saldo Awal Hari Ini:`,
+            `👉 *Rp ${masuk.toLocaleString('id-ID')}*`,
+            ``,
+            `💸 Belanja Hari Ini:`,
+            `👉 *Rp ${keluar.toLocaleString('id-ID')}*`,
+            `━━━━━━━━━━━━━━━━━━━━`,
+            `✨ *SISA SALDO AKHIR:*`,
+            `👉 *Rp ${saldo.toLocaleString('id-ID')}*`,
+            `━━━━━━━━━━━━━━━━━━━━`,
+            `💡 _Sudah dicatat semua? Yuk cek kembali sebelum istirahat!_`
+        ].join('\n');
+
+        for (const chatId of ALLOWED_NUMBERS) {
+            await client.sendMessage(chatId, autoMsg);
+        }
+        console.log('>>> SYSTEM: Laporan otomatis jam 23:00 terkirim.');
+    } catch (err) {
+        console.error("Gagal mengirim rekap otomatis:", err.message);
+    }
+}, {
+    scheduled: true,
+    timezone: "Asia/Jakarta"
 });
 
 // ============================================================
@@ -267,13 +272,13 @@ client.on('message', async (msg) => {
                 const kategoriMap = {
                     'Anabul 🐾': ['kucing', 'cat', 'whiskas', 'pasir', 'grooming', 'petshop', 'meo', 'bolt', 'vet', 'yengki', 'pet'],
                     'Masak 🔥': ['belanja', 'pasar', 'telor', 'ikan', 'ayam', 'sayur'],
-                    'Jajan 🥖': ['jajan', 'snack'],
-                    'Konsumsi 🍔': ['makan', 'minum', 'nasi', 'buah', 'mie', 'bakso' , 'roti', 'warteg', 'sate', 'pecel', 'gorengan'],
+                    'Jajan 🥖': ['jajan', 'snack', 'roti'],
+                    'Konsumsi 🍔': ['makan', 'minum', 'nasi', 'buah', 'mie', 'bakso', 'warteg', 'sate', 'pecel', 'gorengan'],
                     'Transport 🚗': ['bensin', 'parkir', 'ojek', 'grab', 'gojek', 'bus', 'kereta', 'tol', 'ban', 'oli', 'service', 'steam', 'emoney', 'pertamax'],
-                    'Kebutuhan 🏠': ['superindo', 'indomaret', 'listrik', 'wifi', 'sabun','sunlight', 'sampo', 'detergent', 'galon', 'gas', 'gigi', 'tisu', 'beras', 'odol', 'perlengkapan', 'deodoran'],
+                    'Kebutuhan 🏠': ['superindo', 'indomaret', 'listrik', 'wifi', 'sabun', 'sunlight', 'sampo', 'detergent', 'galon', 'gas', 'gigi', 'tisu', 'beras', 'odol', 'perlengkapan', 'deodoran', 'cumuk'],
                     'Kesehatan 💊': ['obat', 'vitamin', 'dokter', 'apotek', 'masker', 'rs', 'klinik', 'p3k', 'paracetamol'],
                     'Hiburan 🎮': ['netflix', 'spotify', 'bioskop', 'game', 'topup', 'youtube', 'nonton', 'travel', 'tiket', 'kampung'],
-                    'Pribadi 📚': ['liquid', 'kopi', 'pulsa', 'kuota', 'hairspray', 'kerja', 'kosiro', 'wardah', 'kantor', 'semester', 'tugas'],
+                    'Pribadi 📚': ['liquid', 'kopi', 'pulsa', 'kuota', 'hairspray', 'kerja', 'kosiro', 'wardah', 'kantor', 'icloud', 'cukur', 'tugas'],
                 };
                 for (const [key, keywords] of Object.entries(kategoriMap)) {
                     if (keywords.some(k => namaLow.includes(k))) { subKategori = key; break; }
