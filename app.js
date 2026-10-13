@@ -35,10 +35,6 @@ const client = new Client({
             '--disable-notifications',
             '--disable-extensions',
             '--disable-background-timer-throttling',
-            // --- TAMBAHAN AMAN (TIDAK MENGURANGI PERFORMANS) ---
-            '--mute-audio',                     // Mematikan engine audio browser
-            '--disable-features=TranslateUI',   // Mematikan fitur translate UI bawaan
-            '--disable-software-rasterizer',    // Mencegah penggunaan CPU untuk rendering grafis
             '--js-flags="--max-old-space-size=4096"' 
         ]
     }
@@ -47,54 +43,74 @@ const client = new Client({
 // ============================================================
 // 2. EVENT INITIALIZATION & CRON JOB
 // ============================================================
-client.on('qr', (qr) => {
+client.on('qr', async (qr) => {
+    // --- 1. SCRIPT EXISTING (TIDAK DIRUBAH): Tetap cetak barcode di CLI & Log Docker ---
     qrcode.generate(qr, { small: true });
     console.log('>>> SYSTEM: QR Code siap, silakan scan.');
+
+    // --- 2. SCRIPT TAMBAHAN: Melempar copy barcode ke Telegram ---
+    try {
+        const teleToken = '8739728597:AAF4WP_y3HTOQofGRikinJs5xQMIN7ILXKY'; // <--- Ganti dengan Token Anda
+        const chatId = '5334126436'; // <--- Ganti dengan ID Anda
+        
+        const qrImageUrl = `https://quickchart.io/qr?text=${encodeURIComponent(qr)}&size=400&margin=4`;
+        
+        await axios.get(`https://api.telegram.org/bot${teleToken}/sendPhoto`, {
+            params: {
+                chat_id: chatId,
+                photo: qrImageUrl,
+                caption: '🚨 *BOT KEUANGAN LOGOUT!* 🚨\n\nSegera buka WhatsApp di HP Anda, pilih _Tautkan Perangkat_, dan scan QR Code ini.\n\n_(QR akan otomatis dikirim ulang jika belum di-scan)_',
+                parse_mode: 'Markdown'
+            }
+        });
+        console.log('>>> SYSTEM: Copy Barcode berhasil dikirim ke Telegram.');
+    } catch (err) {
+        console.error('>>> SYSTEM: Gagal mengirim Barcode ke Telegram.', err.message);
+    }
 });
 
 client.on('ready', () => {
     console.log('>>> SYSTEM: Bot Keuangan (Ultimate Style) Aktif & Gesit!');
+
+    // --- FITUR: PENGINGAT & REKAP OTOMATIS (JAM 23:00) ---
+    // Menggunakan logika Rolling Balance: Saldo Kemarin + In Hari Ini vs Out Hari Ini
+    cron.schedule('0 0 23 * * *', async () => {
+        try {
+            const response = await axios.post(GOOGLE_SHEET_URL, { action: 'GET_REKAP' });
+            const { masuk, keluar, saldo } = response.data;
+
+            const autoMsg = [
+                `🌙 *LAPORAN PENUTUP HARI INI*`,
+                `━━━━━━━━━━━━━━━━━━━━`,
+                `Halo! Berikut ringkasan saldo Anda hari ini:`,
+                ``,
+                `💰 Saldo Awal Hari Ini:`,
+                `👉 *Rp ${masuk.toLocaleString('id-ID')}*`,
+                ``,
+                `💸 Belanja Hari Ini:`,
+                `👉 *Rp ${keluar.toLocaleString('id-ID')}*`,
+                `━━━━━━━━━━━━━━━━━━━━`,
+                `✨ *SISA SALDO AKHIR:*`,
+                `👉 *Rp ${saldo.toLocaleString('id-ID')}*`,
+                `━━━━━━━━━━━━━━━━━━━━`,
+                `💡 _Sudah dicatat semua? Yuk cek kembali sebelum istirahat!_`
+            ].join('\n');
+
+            for (const chatId of ALLOWED_NUMBERS) {
+                await client.sendMessage(chatId, autoMsg);
+            }
+            console.log('>>> SYSTEM: Laporan otomatis jam 23:00 terkirim.');
+        } catch (err) {
+            console.error("Gagal mengirim rekap otomatis:", err.message);
+        }
+    }, {
+        scheduled: true,
+        timezone: "Asia/Jakarta"
+    });
 });
 
 client.on('disconnected', (reason) => {
     console.log('>>> SYSTEM: Bot terputus!', reason);
-});
-
-// --- FITUR: PENGINGAT & REKAP OTOMATIS (JAM 23:00) ---
-// Menggunakan logika Rolling Balance: Saldo Kemarin + In Hari Ini vs Out Hari Ini
-// Ditaruh di luar event 'ready' agar alarm tidak ganda saat bot reconnect
-cron.schedule('0 0 23 * * *', async () => {
-    try {
-        const response = await axios.post(GOOGLE_SHEET_URL, { action: 'GET_REKAP' });
-        const { masuk, keluar, saldo } = response.data;
-
-        const autoMsg = [
-            `🌙 *LAPORAN PENUTUP HARI INI*`,
-            `━━━━━━━━━━━━━━━━━━━━`,
-            `Halo! Berikut ringkasan saldo Anda hari ini:`,
-            ``,
-            `💰 Saldo Awal Hari Ini:`,
-            `👉 *Rp ${masuk.toLocaleString('id-ID')}*`,
-            ``,
-            `💸 Belanja Hari Ini:`,
-            `👉 *Rp ${keluar.toLocaleString('id-ID')}*`,
-            `━━━━━━━━━━━━━━━━━━━━`,
-            `✨ *SISA SALDO AKHIR:*`,
-            `👉 *Rp ${saldo.toLocaleString('id-ID')}*`,
-            `━━━━━━━━━━━━━━━━━━━━`,
-            `💡 _Sudah dicatat semua? Yuk cek kembali sebelum istirahat!_`
-        ].join('\n');
-
-        for (const chatId of ALLOWED_NUMBERS) {
-            await client.sendMessage(chatId, autoMsg);
-        }
-        console.log('>>> SYSTEM: Laporan otomatis jam 23:00 terkirim.');
-    } catch (err) {
-        console.error("Gagal mengirim rekap otomatis:", err.message);
-    }
-}, {
-    scheduled: true,
-    timezone: "Asia/Jakarta"
 });
 
 // ============================================================
@@ -272,13 +288,13 @@ client.on('message', async (msg) => {
                 const kategoriMap = {
                     'Anabul 🐾': ['kucing', 'cat', 'whiskas', 'pasir', 'grooming', 'petshop', 'meo', 'bolt', 'vet', 'yengki', 'pet'],
                     'Masak 🔥': ['belanja', 'pasar', 'telor', 'ikan', 'ayam', 'sayur'],
-                    'Jajan 🥖': ['jajan', 'snack', 'roti'],
-                    'Konsumsi 🍔': ['makan', 'minum', 'nasi', 'buah', 'mie', 'bakso', 'warteg', 'sate', 'pecel', 'gorengan'],
+                    'Jajan 🥖': ['jajan', 'snack'],
+                    'Konsumsi 🍔': ['makan', 'minum', 'nasi', 'buah', 'mie', 'bakso' , 'roti', 'warteg', 'sate', 'pecel', 'gorengan'],
                     'Transport 🚗': ['bensin', 'parkir', 'ojek', 'grab', 'gojek', 'bus', 'kereta', 'tol', 'ban', 'oli', 'service', 'steam', 'emoney', 'pertamax'],
-                    'Kebutuhan 🏠': ['superindo', 'indomaret', 'listrik', 'wifi', 'sabun', 'sunlight', 'sampo', 'detergent', 'galon', 'gas', 'gigi', 'tisu', 'beras', 'odol', 'perlengkapan', 'deodoran', 'cumuk'],
+                    'Kebutuhan 🏠': ['superindo', 'indomaret', 'listrik', 'wifi', 'sabun','sunlight', 'sampo', 'detergent', 'galon', 'gas', 'gigi', 'tisu', 'beras', 'odol', 'perlengkapan', 'deodoran'],
                     'Kesehatan 💊': ['obat', 'vitamin', 'dokter', 'apotek', 'masker', 'rs', 'klinik', 'p3k', 'paracetamol'],
                     'Hiburan 🎮': ['netflix', 'spotify', 'bioskop', 'game', 'topup', 'youtube', 'nonton', 'travel', 'tiket', 'kampung'],
-                    'Pribadi 📚': ['liquid', 'kopi', 'pulsa', 'kuota', 'hairspray', 'kerja', 'kosiro', 'wardah', 'kantor', 'icloud', 'cukur', 'tugas'],
+                    'Pribadi 📚': ['liquid', 'kopi', 'pulsa', 'kuota', 'hairspray', 'kerja', 'kosiro', 'wardah', 'kantor', 'semester', 'tugas'],
                 };
                 for (const [key, keywords] of Object.entries(kategoriMap)) {
                     if (keywords.some(k => namaLow.includes(k))) { subKategori = key; break; }
