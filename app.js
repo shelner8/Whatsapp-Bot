@@ -266,12 +266,14 @@ client.on('message', async (msg) => {
             } else {
                 const kategoriMap = {
                     'Anabul 🐾': ['kucing', 'cat', 'whiskas', 'pasir', 'grooming', 'petshop', 'meo', 'bolt', 'vet', 'yengki', 'pet'],
-                    'Konsumsi 🍔': ['makan', 'minum', 'nasi', 'mie', 'bakso', 'ayam', 'roti', 'snack', 'warteg', 'sate', 'jajan', 'susu', 'martabak', 'pecel', 'gorengan', 'telor'],
+                    'Masak 🔥': ['belanja', 'pasar', 'telor', 'ikan', 'ayam', 'sayur'],
+                    'Jajan 🥖': ['jajan', 'snack'],
+                    'Konsumsi 🍔': ['makan', 'minum', 'nasi', 'buah', 'mie', 'bakso' , 'roti', 'warteg', 'sate', 'pecel', 'gorengan'],
                     'Transport 🚗': ['bensin', 'parkir', 'ojek', 'grab', 'gojek', 'bus', 'kereta', 'tol', 'ban', 'oli', 'service', 'steam', 'emoney', 'pertamax'],
-                    'Kebutuhan 🏠': ['listrik', 'wifi', 'pulsa', 'sabun', 'shampoo', 'belanja', 'pasar', 'detergent', 'galon', 'gas', 'gigi', 'tisu', 'beras', 'odol', 'perlengkapan', 'deodoran'],
+                    'Kebutuhan 🏠': ['superindo', 'indomaret', 'listrik', 'wifi', 'sabun','sunlight', 'sampo', 'detergent', 'galon', 'gas', 'gigi', 'tisu', 'beras', 'odol', 'perlengkapan', 'deodoran'],
                     'Kesehatan 💊': ['obat', 'vitamin', 'dokter', 'apotek', 'masker', 'rs', 'klinik', 'p3k', 'paracetamol'],
                     'Hiburan 🎮': ['netflix', 'spotify', 'bioskop', 'game', 'topup', 'youtube', 'nonton', 'travel', 'tiket', 'kampung'],
-                    'Pribadi 📚': ['liquid', 'kopi', 'hairspray', 'kerja', 'kosiro', 'wardah', 'kantor', 'semester', 'tugas'],
+                    'Pribadi 📚': ['liquid', 'kopi', 'pulsa', 'kuota', 'hairspray', 'kerja', 'kosiro', 'wardah', 'kantor', 'semester', 'tugas'],
                 };
                 for (const [key, keywords] of Object.entries(kategoriMap)) {
                     if (keywords.some(k => namaLow.includes(k))) { subKategori = key; break; }
