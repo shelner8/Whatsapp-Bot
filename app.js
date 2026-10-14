@@ -330,10 +330,10 @@ client.on('message', async (msg) => {
                         'Jajan 🥖': ['jajan', 'snack'],
                         'Konsumsi 🍔': ['makan', 'minum', 'nasi', 'buah', 'mie', 'bakso' , 'roti', 'warteg', 'sate', 'pecel', 'gorengan'],
                         'Transport 🚗': ['bensin', 'parkir', 'ojek', 'grab', 'gojek', 'bus', 'kereta', 'tol', 'ban', 'oli', 'service', 'steam', 'emoney', 'pertamax'],
-                        'Kebutuhan 🏠': ['superindo', 'indomaret', 'listrik', 'wifi', 'sabun','sunlight', 'sampo', 'detergent', 'galon', 'gas', 'gigi', 'tisu', 'beras', 'odol', 'perlengkapan', 'deodoran'],
+                        'Kebutuhan 🏠': ['superindo', 'indomaret', 'listrik', 'wifi', 'sabun','sunlight', 'sampo', 'cumuk', 'detergent', 'galon', 'gas', 'gigi', 'tisu', 'beras', 'odol', 'perlengkapan', 'deodoran'],
                         'Kesehatan 💊': ['obat', 'vitamin', 'dokter', 'apotek', 'masker', 'rs', 'klinik', 'p3k', 'paracetamol'],
-                        'Hiburan 🎮': ['netflix', 'spotify', 'bioskop', 'game', 'topup', 'youtube', 'nonton', 'travel', 'tiket', 'kampung'],
-                        'Pribadi 📚': ['liquid', 'kopi', 'pulsa', 'kuota', 'hairspray', 'kerja', 'kosiro', 'wardah', 'kantor', 'semester', 'tugas'],
+                        'Hiburan 🎮': ['netflix', 'spotify', 'bioskop', 'game', 'topup', 'youtube', 'nonton', 'travel', 'tiket', 'kampung', 'villa', 'puncak'],
+                        'Pribadi 📚': ['liquid', 'kopi', 'pulsa', 'kuota', 'hairspray', 'kerja', 'kosiro', 'wardah', 'kantor', 'cukur', 'tugas', 'icloud'],
                     };
                     for (const [key, keywords] of Object.entries(kategoriMap)) {
                         if (keywords.some(k => namaLow.includes(k))) { subKategori = key; break; }
