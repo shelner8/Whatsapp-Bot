@@ -6,7 +6,7 @@ const cron = require('node-cron');
 // ============================================================
 // 1. KONFIGURASI UTAMA
 // ============================================================
-const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbyTfC6i3p_kjUxdkIB9qJ52yasiq_w4aX73Qm3LoMSfQfzbQ_THdbZmU-hxg5UunauK/exec'; 
+const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbxyVqUmHVddtHwv_hiEOjPRwX9ecspdr7Qd00rnIuDfhck2khMRoTMzcToq-IaTcOy2/exec'; 
 
 const ALLOWED_NUMBERS = [
     '6281288498869@c.us', 
@@ -282,52 +282,95 @@ client.on('message', async (msg) => {
             return msg.reply(`💡 *MENU BOT KEUANGAN*\n━━━━━━━━━━━━━━━━━━━━\n1️⃣ *Catat:* Nama Harga [Metode] \n2️⃣ *Harian:* \`rekap\` \n3️⃣ *Bulanan:* \`rekap bulan\` \n4️⃣ *Cari:* \`History Anabul\` \n5️⃣ *History:* \`History 10\` \n6️⃣ *Visual:* \`Grafik\` \n7️⃣ *Batal:* \`Batal\``);
         }
 
-        // --- LOGIKA CATAT ---
-        const regex = /^(.+)\s(\d+[\d\.,]*(?:k|rb|jt)?)(?:\s(mandiri|cash))?$/i;
-        const match = input.match(regex);
-        if (match) {
-            let namaItem = match[1].trim();
+        // --- LOGIKA CATAT (DUKUNGAN MULTI-ITEM) ---
+        // Memisahkan input berdasarkan koma (,) atau Enter (baris baru)
+        const lines = input.split(/,|\n/);
+        let validTransactions = [];
+        
+        // Regex asli Anda yang sangat stabil dan presisi
+        const regexCatat = /^(.+)\s(\d+[\d\.,]*(?:k|rb|jt)?)(?:\s(mandiri|cash))?$/i;
 
-            if (namaItem.toLowerCase().startsWith('history') || namaItem.toLowerCase().startsWith('riwayat')) {
-                return;
-            }
+        for (let line of lines) {
+            let part = line.trim();
+            if (!part) continue;
 
-            let hargaRaw = match[2].toLowerCase().replace(/,/g, '.');
-            let mtdInput = match[3] ? match[3].toLowerCase() : 'mandiri';
-            let metodeFinal = mtdInput === 'cash' ? 'Cash' : 'Mandiri';
-            let numericValue = parseFloat(hargaRaw);
-            let nominalFinal = 0;
+            const match = part.match(regexCatat);
+            if (match) {
+                let namaItem = match[1].trim();
 
-            if (hargaRaw.includes('k') || hargaRaw.includes('rb')) nominalFinal = numericValue * 1000;
-            else if (hargaRaw.includes('jt')) nominalFinal = numericValue * 1000000;
-            else nominalFinal = numericValue;
-
-            if (isNaN(nominalFinal)) return;
-
-            let tipe = 'Pengeluaran', subKategori = 'Lain-lain 📦';
-            const namaLow = namaItem.toLowerCase();
-            const keywordsPemasukan = ['gaji', 'masuk', 'bonus', 'transfer', 'hibah', 'lembur', 'jual', 'claim', 'refund'];
-            
-            if (keywordsPemasukan.some(k => namaLow.includes(k))) {
-                tipe = 'Pemasukan'; subKategori = 'Income 💰';
-            } else {
-                const kategoriMap = {
-                    'Anabul 🐾': ['kucing', 'cat', 'whiskas', 'pasir', 'grooming', 'petshop', 'meo', 'bolt', 'vet', 'yengki', 'pet'],
-                    'Masak 🔥': ['belanja', 'pasar', 'telor', 'ikan', 'ayam', 'sayur'],
-                    'Jajan 🥖': ['jajan', 'snack'],
-                    'Konsumsi 🍔': ['makan', 'minum', 'nasi', 'buah', 'mie', 'bakso' , 'roti', 'warteg', 'sate', 'pecel', 'gorengan'],
-                    'Transport 🚗': ['bensin', 'parkir', 'ojek', 'grab', 'gojek', 'bus', 'kereta', 'tol', 'ban', 'oli', 'service', 'steam', 'emoney', 'pertamax'],
-                    'Kebutuhan 🏠': ['superindo', 'indomaret', 'listrik', 'wifi', 'sabun','sunlight', 'sampo', 'detergent', 'galon', 'gas', 'gigi', 'tisu', 'beras', 'odol', 'perlengkapan', 'deodoran'],
-                    'Kesehatan 💊': ['obat', 'vitamin', 'dokter', 'apotek', 'masker', 'rs', 'klinik', 'p3k', 'paracetamol'],
-                    'Hiburan 🎮': ['netflix', 'spotify', 'bioskop', 'game', 'topup', 'youtube', 'nonton', 'travel', 'tiket', 'kampung'],
-                    'Pribadi 📚': ['liquid', 'kopi', 'pulsa', 'kuota', 'hairspray', 'kerja', 'kosiro', 'wardah', 'kantor', 'semester', 'tugas'],
-                };
-                for (const [key, keywords] of Object.entries(kategoriMap)) {
-                    if (keywords.some(k => namaLow.includes(k))) { subKategori = key; break; }
+                // Mencegah kata perintah tidak sengaja tereksekusi di sini
+                if (namaItem.toLowerCase().startsWith('history') || 
+                    namaItem.toLowerCase().startsWith('riwayat') || 
+                    namaItem.toLowerCase().startsWith('rekap')) {
+                    continue;
                 }
+
+                let hargaRaw = match[2].toLowerCase().replace(/,/g, '.');
+                let mtdInput = match[3] ? match[3].toLowerCase() : 'mandiri';
+                let metodeFinal = mtdInput === 'cash' ? 'Cash' : 'Mandiri';
+                let numericValue = parseFloat(hargaRaw);
+                let nominalFinal = 0;
+
+                if (hargaRaw.includes('k') || hargaRaw.includes('rb')) nominalFinal = numericValue * 1000;
+                else if (hargaRaw.includes('jt')) nominalFinal = numericValue * 1000000;
+                else nominalFinal = numericValue;
+
+                if (isNaN(nominalFinal)) continue;
+
+                let tipe = 'Pengeluaran', subKategori = 'Lain-lain 📦';
+                const namaLow = namaItem.toLowerCase();
+                const keywordsPemasukan = ['gaji', 'masuk', 'bonus', 'transfer', 'hibah', 'lembur', 'jual', 'claim', 'refund'];
+                
+                if (keywordsPemasukan.some(k => namaLow.includes(k))) {
+                    tipe = 'Pemasukan'; subKategori = 'Income 💰';
+                } else {
+                    const kategoriMap = {
+                        'Anabul 🐾': ['kucing', 'cat', 'whiskas', 'pasir', 'grooming', 'petshop', 'meo', 'bolt', 'vet', 'yengki', 'pet'],
+                        'Masak 🔥': ['belanja', 'pasar', 'telor', 'ikan', 'ayam', 'sayur'],
+                        'Jajan 🥖': ['jajan', 'snack'],
+                        'Konsumsi 🍔': ['makan', 'minum', 'nasi', 'buah', 'mie', 'bakso' , 'roti', 'warteg', 'sate', 'pecel', 'gorengan'],
+                        'Transport 🚗': ['bensin', 'parkir', 'ojek', 'grab', 'gojek', 'bus', 'kereta', 'tol', 'ban', 'oli', 'service', 'steam', 'emoney', 'pertamax'],
+                        'Kebutuhan 🏠': ['superindo', 'indomaret', 'listrik', 'wifi', 'sabun','sunlight', 'sampo', 'detergent', 'galon', 'gas', 'gigi', 'tisu', 'beras', 'odol', 'perlengkapan', 'deodoran'],
+                        'Kesehatan 💊': ['obat', 'vitamin', 'dokter', 'apotek', 'masker', 'rs', 'klinik', 'p3k', 'paracetamol'],
+                        'Hiburan 🎮': ['netflix', 'spotify', 'bioskop', 'game', 'topup', 'youtube', 'nonton', 'travel', 'tiket', 'kampung'],
+                        'Pribadi 📚': ['liquid', 'kopi', 'pulsa', 'kuota', 'hairspray', 'kerja', 'kosiro', 'wardah', 'kantor', 'semester', 'tugas'],
+                    };
+                    for (const [key, keywords] of Object.entries(kategoriMap)) {
+                        if (keywords.some(k => namaLow.includes(k))) { subKategori = key; break; }
+                    }
+                }
+                
+                // Simpan transaksi yang valid ke dalam array
+                validTransactions.push({
+                    tipe, subKategori, metodeFinal, nominalFinal, namaItem
+                });
             }
-            await axios.post(GOOGLE_SHEET_URL, { Kategori: tipe, SubKategori: subKategori, Metode: metodeFinal, Nominal: nominalFinal, Keterangan: namaItem });
-            return msg.reply(`✅ *${tipe.toUpperCase()} BERHASIL*\n━━━━━━━━━━━━━━\n📂 *Sub:* ${subKategori}\n💳 *Metode:* ${metodeFinal}\n💰 *Nominal:* Rp ${nominalFinal.toLocaleString('id-ID')}\n📝 *Item:* ${namaItem}`);
+        }
+
+        // Eksekusi pengiriman ke Google Sheet berdasarkan jumlah item
+        if (validTransactions.length > 0) {
+            
+            // JIKA HANYA 1 ITEM (Kembalikan persis seperti format existing agar tidak ada perubahan)
+            if (validTransactions.length === 1) {
+                let tx = validTransactions[0];
+                await axios.post(GOOGLE_SHEET_URL, { Kategori: tx.tipe, SubKategori: tx.subKategori, Metode: tx.metodeFinal, Nominal: tx.nominalFinal, Keterangan: tx.namaItem });
+                return msg.reply(`✅ *${tx.tipe.toUpperCase()} BERHASIL*\n━━━━━━━━━━━━━━\n📂 *Sub:* ${tx.subKategori}\n💳 *Metode:* ${tx.metodeFinal}\n💰 *Nominal:* Rp ${tx.nominalFinal.toLocaleString('id-ID')}\n📝 *Item:* ${tx.namaItem}`);
+            } 
+            
+            // JIKA MULTI-ITEM (Format pesan baru)
+            else {
+                let replyText = `✨ *BERHASIL MENCATAT ${validTransactions.length} ITEM*\n━━━━━━━━━━━━━━\n`;
+                let totalNominal = 0;
+                
+                for (let tx of validTransactions) {
+                    await axios.post(GOOGLE_SHEET_URL, { Kategori: tx.tipe, SubKategori: tx.subKategori, Metode: tx.metodeFinal, Nominal: tx.nominalFinal, Keterangan: tx.namaItem });
+                    totalNominal += tx.nominalFinal;
+                    replyText += `✅ *${tx.namaItem}* (Rp ${tx.nominalFinal.toLocaleString('id-ID')}) -> ${tx.subKategori}\n`;
+                }
+                
+                replyText += `━━━━━━━━━━━━━━\n💰 *Total Diproses:* Rp ${totalNominal.toLocaleString('id-ID')}`;
+                return msg.reply(replyText);
+            }
         }
     } catch (error) { console.error("System Error:", error.message); }
 });
