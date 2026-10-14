@@ -6,7 +6,7 @@ const cron = require('node-cron');
 // ============================================================
 // 1. KONFIGURASI UTAMA
 // ============================================================
-const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbxyVqUmHVddtHwv_hiEOjPRwX9ecspdr7Qd00rnIuDfhck2khMRoTMzcToq-IaTcOy2/exec'; 
+const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbyTfC6i3p_kjUxdkIB9qJ52yasiq_w4aX73Qm3LoMSfQfzbQ_THdbZmU-hxg5UunauK/exec'; 
 
 const ALLOWED_NUMBERS = [
     '6281288498869@c.us', 
@@ -50,8 +50,8 @@ client.on('qr', async (qr) => {
 
     // --- 2. SCRIPT TAMBAHAN: Melempar copy barcode ke Telegram ---
     try {
-        const teleToken = '8739728597:AAF4WP_y3HTOQofGRikinJs5xQMIN7ILXKY'; // <--- Ganti dengan Token Anda
-        const chatId = '5334126436'; // <--- Ganti dengan ID Anda
+        const teleToken = '8739728597:AAF4WP_y3HTOQofGRikinJs5xQMIN7ILXKY'; 
+        const chatId = '5334126436'; 
         
         const qrImageUrl = `https://quickchart.io/qr?text=${encodeURIComponent(qr)}&size=400&margin=4`;
         
@@ -73,7 +73,6 @@ client.on('ready', () => {
     console.log('>>> SYSTEM: Bot Keuangan (Ultimate Style) Aktif & Gesit!');
 
     // --- FITUR: PENGINGAT & REKAP OTOMATIS (JAM 23:00) ---
-    // Menggunakan logika Rolling Balance: Saldo Kemarin + In Hari Ini vs Out Hari Ini
     cron.schedule('0 0 23 * * *', async () => {
         try {
             const response = await axios.post(GOOGLE_SHEET_URL, { action: 'GET_REKAP' });
@@ -177,6 +176,34 @@ client.on('message', async (msg) => {
             return;
         }
 
+        // --- FITUR TAMBAHAN: REKAP BULAN SPESIFIK (Contoh: rekap bulan maret) ---
+        const regexBulanSpesifik = /^rekap\s+bulan\s+([a-zA-Z]+)$/i;
+        const matchBulanSpesifik = input.match(regexBulanSpesifik);
+        if (matchBulanSpesifik) {
+            try {
+                const bulanReq = matchBulanSpesifik[1];
+                const response = await axios.post(GOOGLE_SHEET_URL, { action: 'GET_REKAP_BULAN', reqMonth: bulanReq });
+                
+                if (response.data.is404) {
+                    return msg.reply(`📭 Data untuk bulan *${bulanReq.toUpperCase()}* tidak ditemukan.`);
+                }
+
+                const { masuk, keluar, saldo } = response.data;
+                const msgRekapSpesifik = [
+                    `📊 *LAPORAN REKAP BULAN ${bulanReq.toUpperCase()}*`,
+                    `━━━━━━━━━━━━━━━━━━━━`,
+                    `📥 Total Masuk: *Rp ${masuk.toLocaleString('id-ID')}*`,
+                    `📤 Total Keluar: *Rp ${keluar.toLocaleString('id-ID')}*`,
+                    `━━━━━━━━━━━━━━━━━━━━`,
+                    `💰 *SISA SALDO: Rp ${saldo.toLocaleString('id-ID')}*`,
+                    `━━━━━━━━━━━━━━━━━━━━`
+                ].join('\n');
+                return msg.reply(msgRekapSpesifik);
+            } catch (err) { 
+                return msg.reply(`❌ Gagal mengambil data saldo untuk bulan ${matchBulanSpesifik[1]}.`); 
+            }
+        }
+
         // --- FITUR: REKAP (HARIAN VS BULANAN) ---
         if (inputLower === 'rekap' || inputLower === 'rekap bulan' || inputLower === 'rekap bulanan') {
             try {
@@ -197,7 +224,6 @@ client.on('message', async (msg) => {
                         `━━━━━━━━━━━━━━━━━━━━`
                     ].join('\n');
                 } else {
-                    // Logic: Rolling Balance (Saldo kumulatif + In Hari ini vs Out Hari ini)
                     msgRekap = [
                         `📊 *REKAP HARIAN (ROLLING BALANCE)*`,
                         `━━━━━━━━━━━━━━━━━━━━`,
