@@ -6,7 +6,7 @@ const cron = require('node-cron');
 // ============================================================
 // 1. KONFIGURASI UTAMA
 // ============================================================
-const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbxyVqUmHVddtHwv_hiEOjPRwX9ecspdr7Qd00rnIuDfhck2khMRoTMzcToq-IaTcOy2/exec'; 
+const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbyWboaPhqBSnStbLFggoVh4QwwZQXy3equ6aHNxi3a8OMlbjj8q9AFZOOce2nMQJ8cS/exec'; 
 
 const ALLOWED_NUMBERS = [
     '6281288498869@c.us', 
@@ -176,7 +176,7 @@ client.on('message', async (msg) => {
             return;
         }
 
-        // --- FITUR TAMBAHAN: REKAP BULAN SPESIFIK (Contoh: rekap bulan maret) ---
+        // --- FITUR TAMBAHAN: REKAP BULAN SPESIFIK ---
         const regexBulanSpesifik = /^rekap\s+bulan\s+([a-zA-Z]+)$/i;
         const matchBulanSpesifik = input.match(regexBulanSpesifik);
         if (matchBulanSpesifik) {
@@ -282,12 +282,10 @@ client.on('message', async (msg) => {
             return msg.reply(`💡 *MENU BOT KEUANGAN*\n━━━━━━━━━━━━━━━━━━━━\n1️⃣ *Catat:* Nama Harga [Metode] \n2️⃣ *Harian:* \`rekap\` \n3️⃣ *Bulanan:* \`rekap bulan\` \n4️⃣ *Cari:* \`History Anabul\` \n5️⃣ *History:* \`History 10\` \n6️⃣ *Visual:* \`Grafik\` \n7️⃣ *Batal:* \`Batal\``);
         }
 
-        // --- LOGIKA CATAT (DUKUNGAN MULTI-ITEM) ---
-        // Memisahkan input berdasarkan koma (,) atau Enter (baris baru)
+        // --- LOGIKA CATAT (DUKUNGAN MULTI-ITEM & CLOUD CATEGORY) ---
         const lines = input.split(/,|\n/);
         let validTransactions = [];
         
-        // Regex asli Anda yang sangat stabil dan presisi
         const regexCatat = /^(.+)\s(\d+[\d\.,]*(?:k|rb|jt)?)(?:\s(mandiri|cash))?$/i;
 
         for (let line of lines) {
@@ -298,7 +296,6 @@ client.on('message', async (msg) => {
             if (match) {
                 let namaItem = match[1].trim();
 
-                // Mencegah kata perintah tidak sengaja tereksekusi di sini
                 if (namaItem.toLowerCase().startsWith('history') || 
                     namaItem.toLowerCase().startsWith('riwayat') || 
                     namaItem.toLowerCase().startsWith('rekap')) {
@@ -317,55 +314,35 @@ client.on('message', async (msg) => {
 
                 if (isNaN(nominalFinal)) continue;
 
-                let tipe = 'Pengeluaran', subKategori = 'Lain-lain 📦';
-                const namaLow = namaItem.toLowerCase();
-                const keywordsPemasukan = ['gaji', 'masuk', 'bonus', 'transfer', 'hibah', 'lembur', 'jual', 'claim', 'refund'];
-                
-                if (keywordsPemasukan.some(k => namaLow.includes(k))) {
-                    tipe = 'Pemasukan'; subKategori = 'Income 💰';
-                } else {
-                    const kategoriMap = {
-                        'Anabul 🐾': ['kucing', 'cat', 'whiskas', 'pasir', 'grooming', 'petshop', 'meo', 'bolt', 'vet', 'yengki', 'pet'],
-                        'Masak 🔥': ['belanja', 'pasar', 'telor', 'ikan', 'ayam', 'sayur'],
-                        'Jajan 🥖': ['jajan', 'snack'],
-                        'Konsumsi 🍔': ['makan', 'minum', 'nasi', 'buah', 'mie', 'bakso' , 'roti', 'warteg', 'sate', 'pecel', 'gorengan'],
-                        'Transport 🚗': ['bensin', 'parkir', 'ojek', 'grab', 'gojek', 'bus', 'kereta', 'tol', 'ban', 'oli', 'service', 'steam', 'emoney', 'pertamax'],
-                        'Kebutuhan 🏠': ['superindo', 'indomaret', 'listrik', 'wifi', 'sabun','sunlight', 'sampo', 'cumuk', 'detergent', 'galon', 'gas', 'gigi', 'tisu', 'beras', 'odol', 'perlengkapan', 'deodoran'],
-                        'Kesehatan 💊': ['obat', 'vitamin', 'dokter', 'apotek', 'masker', 'rs', 'klinik', 'p3k', 'paracetamol'],
-                        'Hiburan 🎮': ['netflix', 'spotify', 'bioskop', 'game', 'topup', 'youtube', 'nonton', 'travel', 'tiket', 'kampung', 'villa', 'puncak'],
-                        'Pribadi 📚': ['liquid', 'kopi', 'pulsa', 'kuota', 'hairspray', 'kerja', 'kosiro', 'wardah', 'kantor', 'cukur', 'tugas', 'icloud'],
-                    };
-                    for (const [key, keywords] of Object.entries(kategoriMap)) {
-                        if (keywords.some(k => namaLow.includes(k))) { subKategori = key; break; }
-                    }
-                }
-                
-                // Simpan transaksi yang valid ke dalam array
+                // Cukup simpan nama item, metode, dan nominal. Kategori diproses di Google Sheets!
                 validTransactions.push({
-                    tipe, subKategori, metodeFinal, nominalFinal, namaItem
+                    metodeFinal, nominalFinal, namaItem
                 });
             }
         }
 
-        // Eksekusi pengiriman ke Google Sheet berdasarkan jumlah item
         if (validTransactions.length > 0) {
             
-            // JIKA HANYA 1 ITEM (Kembalikan persis seperti format existing agar tidak ada perubahan)
+            // JIKA HANYA 1 ITEM
             if (validTransactions.length === 1) {
                 let tx = validTransactions[0];
-                await axios.post(GOOGLE_SHEET_URL, { Kategori: tx.tipe, SubKategori: tx.subKategori, Metode: tx.metodeFinal, Nominal: tx.nominalFinal, Keterangan: tx.namaItem });
-                return msg.reply(`✅ *${tx.tipe.toUpperCase()} BERHASIL*\n━━━━━━━━━━━━━━\n📂 *Sub:* ${tx.subKategori}\n💳 *Metode:* ${tx.metodeFinal}\n💰 *Nominal:* Rp ${tx.nominalFinal.toLocaleString('id-ID')}\n📝 *Item:* ${tx.namaItem}`);
+                let res = await axios.post(GOOGLE_SHEET_URL, { action: 'CATAT', Metode: tx.metodeFinal, Nominal: tx.nominalFinal, Keterangan: tx.namaItem });
+                let dataCatat = res.data;
+                
+                return msg.reply(`✅ *${dataCatat.Kategori.toUpperCase()} BERHASIL*\n━━━━━━━━━━━━━━\n📂 *Sub:* ${dataCatat.SubKategori}\n💳 *Metode:* ${tx.metodeFinal}\n💰 *Nominal:* Rp ${tx.nominalFinal.toLocaleString('id-ID')}\n📝 *Item:* ${tx.namaItem}`);
             } 
             
-            // JIKA MULTI-ITEM (Format pesan baru)
+            // JIKA MULTI-ITEM
             else {
                 let replyText = `✨ *BERHASIL MENCATAT ${validTransactions.length} ITEM*\n━━━━━━━━━━━━━━\n`;
                 let totalNominal = 0;
                 
                 for (let tx of validTransactions) {
-                    await axios.post(GOOGLE_SHEET_URL, { Kategori: tx.tipe, SubKategori: tx.subKategori, Metode: tx.metodeFinal, Nominal: tx.nominalFinal, Keterangan: tx.namaItem });
+                    let res = await axios.post(GOOGLE_SHEET_URL, { action: 'CATAT', Metode: tx.metodeFinal, Nominal: tx.nominalFinal, Keterangan: tx.namaItem });
+                    let dataCatat = res.data;
                     totalNominal += tx.nominalFinal;
-                    replyText += `✅ *${tx.namaItem}* (Rp ${tx.nominalFinal.toLocaleString('id-ID')}) -> ${tx.subKategori}\n`;
+                    
+                    replyText += `✅ *${tx.namaItem}* (Rp ${tx.nominalFinal.toLocaleString('id-ID')}) -> ${dataCatat.SubKategori}\n`;
                 }
                 
                 replyText += `━━━━━━━━━━━━━━\n💰 *Total Diproses:* Rp ${totalNominal.toLocaleString('id-ID')}`;
