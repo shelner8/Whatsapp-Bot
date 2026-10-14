@@ -6,7 +6,7 @@ const cron = require('node-cron');
 // ============================================================
 // 1. KONFIGURASI UTAMA
 // ============================================================
-const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbyWboaPhqBSnStbLFggoVh4QwwZQXy3equ6aHNxi3a8OMlbjj8q9AFZOOce2nMQJ8cS/exec'; 
+const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzma6AFWsHCHLF7XiSFKU8TS2mI7eGm0sU3XMA3Kc3kOVvDuT_Xdo9a2FvNZata1AJx/exec'; 
 
 const ALLOWED_NUMBERS = [
     '6281288498869@c.us', 
@@ -44,11 +44,9 @@ const client = new Client({
 // 2. EVENT INITIALIZATION & CRON JOB
 // ============================================================
 client.on('qr', async (qr) => {
-    // --- 1. SCRIPT EXISTING (TIDAK DIRUBAH): Tetap cetak barcode di CLI & Log Docker ---
     qrcode.generate(qr, { small: true });
     console.log('>>> SYSTEM: QR Code siap, silakan scan.');
 
-    // --- 2. SCRIPT TAMBAHAN: Melempar copy barcode ke Telegram ---
     try {
         const teleToken = '8739728597:AAF4WP_y3HTOQofGRikinJs5xQMIN7ILXKY'; 
         const chatId = '5334126436'; 
@@ -176,6 +174,30 @@ client.on('message', async (msg) => {
             return;
         }
 
+        // --- FITUR TAMBAHAN: DYNAMIC KEYWORD TRAINER (!tambah) ---
+        const regexTambah = /^!tambah\s+(.+?)\s*=\s*(.+)$/i;
+        const matchTambah = input.match(regexTambah);
+        if (matchTambah) {
+            try {
+                const subKatReq = matchTambah[1].trim();
+                const keywordReq = matchTambah[2].trim();
+                
+                const response = await axios.post(GOOGLE_SHEET_URL, { 
+                    action: 'ADD_KEYWORD', 
+                    subKategori: subKatReq, 
+                    keyword: keywordReq 
+                });
+                
+                if (response.data.status === "Sukses") {
+                    return msg.reply(`🧠 *BOT MAKIN PINTAR!*\n━━━━━━━━━━━━━━━━━━━━\nKata kunci: *${response.data.keyword}*\nBerhasil ditambahkan ke kategori: *${response.data.subKategori}*\n\n_Silakan catat pengeluaran Anda seperti biasa._`);
+                } else {
+                    return msg.reply(`❌ ${response.data.message}`);
+                }
+            } catch (err) {
+                return msg.reply('❌ Gagal menghubungi server Google Sheets untuk menambah kata kunci.');
+            }
+        }
+
         // --- FITUR TAMBAHAN: REKAP BULAN SPESIFIK ---
         const regexBulanSpesifik = /^rekap\s+bulan\s+([a-zA-Z]+)$/i;
         const matchBulanSpesifik = input.match(regexBulanSpesifik);
@@ -279,7 +301,7 @@ client.on('message', async (msg) => {
 
         // --- FITUR: MENU BANTUAN ---
         if (['help', 'menu', 'p'].includes(inputLower)) {
-            return msg.reply(`💡 *MENU BOT KEUANGAN*\n━━━━━━━━━━━━━━━━━━━━\n1️⃣ *Catat:* Nama Harga [Metode] \n2️⃣ *Harian:* \`rekap\` \n3️⃣ *Bulanan:* \`rekap bulan\` \n4️⃣ *Cari:* \`History Anabul\` \n5️⃣ *History:* \`History 10\` \n6️⃣ *Visual:* \`Grafik\` \n7️⃣ *Batal:* \`Batal\``);
+            return msg.reply(`💡 *MENU BOT KEUANGAN*\n━━━━━━━━━━━━━━━━━━━━\n1️⃣ *Catat:* Nama Harga [Metode] \n2️⃣ *Harian:* \`rekap\` \n3️⃣ *Bulanan:* \`rekap bulan\` \n4️⃣ *Cari:* \`History Anabul\` \n5️⃣ *History:* \`History 10\` \n6️⃣ *Visual:* \`Grafik\` \n7️⃣ *Batal:* \`Batal\` \n8️⃣ *Tambah Kamus:* \`!tambah Jajan = mixue\``);
         }
 
         // --- LOGIKA CATAT (DUKUNGAN MULTI-ITEM & CLOUD CATEGORY) ---
@@ -296,9 +318,11 @@ client.on('message', async (msg) => {
             if (match) {
                 let namaItem = match[1].trim();
 
+                // Abaikan perintah bawaan
                 if (namaItem.toLowerCase().startsWith('history') || 
                     namaItem.toLowerCase().startsWith('riwayat') || 
-                    namaItem.toLowerCase().startsWith('rekap')) {
+                    namaItem.toLowerCase().startsWith('rekap') ||
+                    namaItem.toLowerCase().startsWith('!tambah')) {
                     continue;
                 }
 
@@ -314,7 +338,6 @@ client.on('message', async (msg) => {
 
                 if (isNaN(nominalFinal)) continue;
 
-                // Cukup simpan nama item, metode, dan nominal. Kategori diproses di Google Sheets!
                 validTransactions.push({
                     metodeFinal, nominalFinal, namaItem
                 });
